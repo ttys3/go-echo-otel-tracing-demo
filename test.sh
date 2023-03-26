@@ -1,7 +1,5 @@
 #!/bin/sh
 
-#!/bin/sh
-
 set -e
 
 function with_remote()
@@ -17,8 +15,6 @@ function with_remote()
          -H "user-agent: curl/7.64.1" \
          -H "accept: */*" \
          -X GET \
-         -d '{"username":"admin","password":"admin", "two_factor_token": "xx"}' \
-         -H 'Content-Type: application/json' \
          http://127.0.0.1:1323/
 
 }
@@ -29,7 +25,6 @@ function without_remote()
     echo "without remote context"
     # curl with trace context
     curl -X GET \
-         -d '{"username":"admin","password":"admin", "two_factor_token": "xx"}' \
          -H 'Content-Type: application/json' \
          http://127.0.0.1:1323/
 }
