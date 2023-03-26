@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"go.opentelemetry.io/otel/trace"
+	"log"
 	"net/http"
 	"time"
 
@@ -11,6 +13,7 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/github.com/labstack/echo/otelecho"
 	"go.opentelemetry.io/contrib/propagators/b3"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/exporters/jaeger"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
@@ -18,24 +21,45 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.18.0"
 )
 
+var exporter string = "otlp"
+
 func main() {
+	flag.StringVar(&exporter, "exporter", exporter, "exporter type: otlp or jaeger")
+	flag.Parse()
+
+	var spanExporter sdktrace.SpanExporter
+
 	// setup tracing exporter
 	grpcConnectionTimeout := 3 * time.Second
 	var cancel context.CancelFunc
 	ctx, cancel := context.WithTimeout(context.Background(), grpcConnectionTimeout)
 	defer cancel()
 
-	spanExporter, err := otlptracegrpc.New(ctx)
-	if err != nil {
-		panic(err)
+	if exporter == "jaeger" {
+		log.Printf("using jaeger exporter")
+		// new jaeger exporter
+		jaegerExporter, err := jaeger.New(jaeger.WithCollectorEndpoint(jaeger.WithEndpoint("http://localhost:14268/api/traces")))
+		if err != nil {
+			panic(err)
+		}
+		spanExporter = jaegerExporter
+	} else {
+		log.Printf("using otlp exporter")
+		// new otlp exporter
+		otlpExporter, err := otlptracegrpc.New(ctx)
+		if err != nil {
+			panic(err)
+		}
+		spanExporter = otlpExporter
 	}
-	spanProcessor := sdktrace.NewSimpleSpanProcessor(spanExporter)
 
 	attrs := resource.WithAttributes(semconv.ServiceName("demo-service"))
 	res, err := resource.New(ctx, attrs)
 	if err != nil {
 		panic(err)
 	}
+
+	spanProcessor := sdktrace.NewSimpleSpanProcessor(spanExporter)
 
 	tp := sdktrace.NewTracerProvider(
 		sdktrace.WithSampler(sdktrace.AlwaysSample()),
