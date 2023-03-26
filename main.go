@@ -32,10 +32,13 @@ func main() {
 	spanProcessor := sdktrace.NewSimpleSpanProcessor(spanExporter)
 
 	attrs := resource.WithAttributes(semconv.ServiceName("demo-service"))
-	res, _ := resource.New(ctx, attrs)
+	res, err := resource.New(ctx, attrs)
+	if err != nil {
+		panic(err)
+	}
 
 	tp := sdktrace.NewTracerProvider(
-		sdktrace.WithSampler(sdktrace.ParentBased(sdktrace.TraceIDRatioBased(1))),
+		sdktrace.WithSampler(sdktrace.AlwaysSample()),
 		sdktrace.WithSpanProcessor(spanProcessor),
 		sdktrace.WithResource(res),
 	)
@@ -43,6 +46,7 @@ func main() {
 	otel.SetTracerProvider(tp)
 	defer tp.Shutdown(ctx)
 
+	// you can use any propagator you want
 	b3propagator := b3.New(b3.WithInjectEncoding(b3.B3MultipleHeader))
 	propagator := propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{}, b3propagator)
 	// set global propagator
